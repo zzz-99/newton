@@ -24,8 +24,8 @@ class Example:
         # ground
         builder.add_ground_plane()
 
-        # basic contact parameters (soft contact model used by SemiImplicit)
-        # tuned moderately for stable rolling without excessive bounce
+        # 基础接触参数（SemiImplicit 的软接触模型）
+        # 提高滚动稳定性，减少落地弹跳
         builder.default_shape_cfg.mu = 0.8
 
         # chassis dimensions and placement
@@ -86,26 +86,23 @@ class Example:
                 key=f"wheel_vis_{i}",
             )
 
-            # collision box approximating cylinder's oriented bounding box
-            # For cylinder axis along Y, bounding box extents should be:
-            # local hx=r, hy=r, hz=half_height (after rotX(90°): hy -> world Z = r)
+            # collision cylinder for rolling contact
             col_cfg = builder.default_shape_cfg.copy()
             col_cfg.has_shape_collision = True
             col_cfg.is_visible = False
-            col_cfg.mu = 0.9  # slightly higher tire-ground friction
-            builder.add_shape_box(
+            col_cfg.mu = 0.9  # higher tire-ground friction for traction
+            builder.add_shape_cylinder(
                 body_wheel,
                 xform=wp.transform(p=wp.vec3(0.0, 0.0, 0.0), q=cyl_rot_to_y),
-                hx=wheel_radius,
-                hy=wheel_radius,
-                hz=wheel_half_height,
+                radius=wheel_radius,
+                half_height=wheel_half_height,
                 cfg=col_cfg,
                 key=f"wheel_col_{i}",
             )
 
-            # revolute joint at wheel center, axis = Y in parent's local frame
-            # fixed angular velocity via TARGET_VELOCITY
-            omega = 8.0  # rad/s, roughly ~76 RPM
+            # 轮轴关节：父局部坐标系 Y 轴
+            # 采用 TARGET_VELOCITY 驱动；初速度为 0，后续由键盘输入控制
+            omega = 0.0  # 初始角速度为 0
             axis_cfg = newton.ModelBuilder.JointDofConfig(
                 axis=newton.Axis.Y,
                 mode=newton.JointMode.TARGET_VELOCITY,
@@ -131,14 +128,14 @@ class Example:
         # finalize model
         self.model = builder.finalize()
 
-        # tune soft contact (used for rigid collisions in SemiImplicit)
+        # 软接触参数调优：提高阻尼、降低反弹系数，抑制落地弹跳
         self.model.soft_contact_ke = 2.0e3
-        self.model.soft_contact_kd = 2.0e1
+        self.model.soft_contact_kd = 5.0e1
         self.model.soft_contact_mu = 0.8
-        self.model.soft_contact_restitution = 0.1
+        self.model.soft_contact_restitution = 0.02
 
-        # solver
-        self.solver = newton.solvers.SolverSemiImplicit(self.model)
+        # solver：提高角阻尼，进一步降低弹跳与抖动
+        self.solver = newton.solvers.SolverSemiImplicit(self.model, angular_damping=0.12)
 
         # states & control
         self.state_0 = self.model.state()
@@ -147,19 +144,48 @@ class Example:
         self.contacts = self.model.collide(self.state_0)
 
         # viewer and initial FK
+        # ---- 键盘控制与关节映射（需在预运行前初始化）----
+        # 记录四个轮子关节的 DOF 起始索引，便于向 control.joint_target 写入
+        qd_start = self.model.joint_qd_start.numpy()
+        self.wheel_joint_ids = [self.model.joint_key.index(f"hinge_{i}") for i in range(4)]
+        self.wheel_dof_indices = [int(qd_start[jid]) for jid in self.wheel_joint_ids]
+
+        # 总 DOF 数量（最后一个 sentinel 即为总长度）
+        self.joint_dof_count = int(qd_start[-1])
+
+        # 车轮速度控制量（rad/s），初始为 0
+        self.wheel_speed = 0.0
+        self.max_wheel_speed = 30.0  # 上限（约 286 RPM）
+        self.accel_rate = 6.0        # I 加速（rad/s^2）
+        self.brake_rate = 8.0        # K 减速（rad/s^2）
+        self.turn_gain = 4.0         # J/L 差速偏置（rad/s）
+
         self.viewer.set_model(self.model)
         newton.eval_fk(self.model, self.state_0.joint_q, self.state_0.joint_qd, self.state_0)
 
-        # capture graph if cuda
-        self.capture()
+        # 交互示例不使用 Warp 图捕获：需要每帧读取键盘输入
+        # 如果启用图捕获，Python 侧的输入与控制更新会被绕过，导致按键无效
+        self.graph = None
+
+        # 注册一个简单的 UI 面板，显示按键状态与当前车轮速度
+        if hasattr(self.viewer, "register_ui_callback"):
+            self.viewer.register_ui_callback(self.gui, position="stats")
+        # 若 UI 后端不可用，提示安装依赖并说明切换热键
+        try:
+            if hasattr(self.viewer, "ui") and not getattr(self.viewer.ui, "is_available", False):
+                print(
+                    "提示: imgui-bundle 未安装，UI 面板不可用。安装: 'uv add imgui-bundle' 或 'pip install imgui-bundle'。按 H 切换 UI 显示。"
+                )
+        except Exception:
+            pass
+
+        # 控制台按键状态打印的节流计时器（UI 不可用时生效）
+        self._last_key_print_t = -1.0
 
     def capture(self):
-        if wp.get_device().is_cuda:
-            with wp.ScopedCapture() as capture:
-                self.simulate()
-            self.graph = capture.graph
-        else:
-            self.graph = None
+        # 说明：为保持交互性，本示例默认禁用图捕获。
+        # 若需要离线/确定性回放，可手动启用并注意不要依赖键盘输入。
+        self.graph = None
 
     def simulate(self):
         for _ in range(self.sim_substeps):
@@ -167,6 +193,51 @@ class Example:
 
             # allow interactive forces (mouse picking, etc.)
             self.viewer.apply_forces(self.state_0)
+
+            # ---- 键盘输入：IJKL ----
+            # I：加速，K：减速（可反向），J：左转（左慢右快），L：右转（左快右慢）
+            i_down = self.viewer.is_key_down("i")
+            k_down = self.viewer.is_key_down("k")
+            j_down = self.viewer.is_key_down("j")
+            l_down = self.viewer.is_key_down("l")
+
+            if i_down:
+                self.wheel_speed += self.accel_rate * self.sim_dt
+            if k_down:
+                self.wheel_speed -= self.brake_rate * self.sim_dt
+
+            # 限幅
+            self.wheel_speed = max(-self.max_wheel_speed, min(self.wheel_speed, self.max_wheel_speed))
+
+            turn = 0.0
+            if j_down:
+                turn -= self.turn_gain
+            if l_down:
+                turn += self.turn_gain
+
+            left = self.wheel_speed - turn
+            right = self.wheel_speed + turn
+
+            # 控制台回退：在 UI 不可用时，周期性打印按键状态与速度，便于确认事件捕获
+            try:
+                ui_available = hasattr(self.viewer, "ui") and getattr(self.viewer.ui, "is_available", False)
+            except Exception:
+                ui_available = False
+            if not ui_available:
+                if self.sim_time - (self._last_key_print_t if self._last_key_print_t is not None else -1.0) > 0.5:
+                    if i_down or k_down or j_down or l_down:
+                        print(
+                            f"[Keys] I={i_down} K={k_down} J={j_down} L={l_down} speed={self.wheel_speed:.2f}"
+                        )
+                    self._last_key_print_t = self.sim_time
+
+            # 将目标速度写入四个轮子的 DOF 目标
+            targets = [0.0] * self.joint_dof_count
+            targets[self.wheel_dof_indices[0]] = left   # front-left
+            targets[self.wheel_dof_indices[1]] = right  # front-right
+            targets[self.wheel_dof_indices[2]] = left   # rear-left
+            targets[self.wheel_dof_indices[3]] = right  # rear-right
+            self.control.joint_target.assign(targets)
 
             # explicit collision update for non-MuJoCo solvers
             self.contacts = self.model.collide(self.state_0)
@@ -178,11 +249,8 @@ class Example:
             self.sim_time += self.sim_dt
 
     def step(self):
-        if self.graph:
-            wp.capture_launch(self.graph)
-        else:
-            self.simulate()
-
+        # 始终逐步仿真以读取实时按键与更新控制
+        self.simulate()
         self.sim_time += self.frame_dt
 
     def render(self):
@@ -190,6 +258,42 @@ class Example:
         self.viewer.log_state(self.state_0)
         self.viewer.log_contacts(self.contacts, self.state_0)
         self.viewer.end_frame()
+
+    def gui(self, ui):
+        # 依赖 imgui_bundle，若不可用则跳过
+        if not getattr(ui, "is_available", False):
+            return
+        imgui = ui.imgui
+
+        imgui.begin("Car Controls & Status", flags=imgui.WindowFlags_.always_auto_resize)
+
+        # 实时按键状态指示
+        i_down = self.viewer.is_key_down("i")
+        k_down = self.viewer.is_key_down("k")
+        j_down = self.viewer.is_key_down("j")
+        l_down = self.viewer.is_key_down("l")
+        imgui.text(f"Keys: I={i_down} K={k_down} J={j_down} L={l_down}")
+
+        # 当前参数与速度
+        imgui.text(f"wheel_speed: {self.wheel_speed:.2f} rad/s")
+        imgui.text(f"accel_rate: {self.accel_rate:.2f}  brake_rate: {self.brake_rate:.2f}")
+        imgui.text(f"turn_gain: {self.turn_gain:.2f}  max: {self.max_wheel_speed:.1f}")
+
+        # 可调滑块（便于现场调试）
+        changed, val = imgui.slider_float("accel_rate", self.accel_rate, 0.0, 20.0, "%.2f")
+        if changed:
+            self.accel_rate = float(val)
+        changed, val = imgui.slider_float("brake_rate", self.brake_rate, 0.0, 20.0, "%.2f")
+        if changed:
+            self.brake_rate = float(val)
+        changed, val = imgui.slider_float("turn_gain", self.turn_gain, 0.0, 20.0, "%.2f")
+        if changed:
+            self.turn_gain = float(val)
+        changed, val = imgui.slider_float("max_wheel_speed", self.max_wheel_speed, 5.0, 60.0, "%.1f")
+        if changed:
+            self.max_wheel_speed = float(val)
+
+        imgui.end()
 
 
 if __name__ == "__main__":
