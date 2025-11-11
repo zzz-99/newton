@@ -1,0 +1,56 @@
+{
+    "rigid_bodies": [
+        {
+            "id": "body",
+            "shape": "box",
+            "size": [
+                1.5,
+                0.3,
+                0.5
+            ],
+            "pos": [
+                0,
+                0.5,
+                0
+            ]
+        },
+        {
+            "id": "hub_FL",
+            "shape": "cylinder",
+            "radius": 0.15,
+            "height": 0.1,
+            "pos": [
+                0.7,
+                0.3,
+                0.4
+            ]
+        }
+    ],
+    "soft_bodies": [
+        {
+            "id": "tire_FL",
+            "type": "sphere",
+            "radius": 0.25,
+            "resolution": 10,
+            "pos": [
+                0.7,
+                0.3,
+                0.4
+            ]
+        }
+    ],
+    "constraints": [
+        {
+            "type": "anchor",
+            "rigid": "hub_FL",
+            "soft": "tire_FL",
+            "points": [
+                5,
+                10,
+                15,
+                20
+            ],
+            "stiffness": 1.0
+        }
+    ]
+}

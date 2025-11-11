@@ -1,0 +1,20 @@
+{
+    "rigid_soft_links": [
+        {
+            "rigid": "hub_FL",
+            "soft": "tire_FL",
+            "points": [
+                10,
+                25,
+                40,
+                55
+            ],
+            "type": "anchor",
+            "stiffness": 1.0
+        }
+    ],
+    "soft_internal": {
+        "edge_stiffness": 0.8,
+        "volume_stiffness": 0.9
+    }
+}

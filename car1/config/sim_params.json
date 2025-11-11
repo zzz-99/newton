@@ -1,0 +1,5 @@
+{
+    "time_step": 0.01,
+    "substeps": 10,
+    "solver_iterations": 5
+}
