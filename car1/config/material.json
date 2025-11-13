@@ -1,0 +1,23 @@
+{
+  "default": {
+    "density": 500.0,
+    "ke": 0.0,
+    "kd": 0.0,
+    "mu": 0.8,
+    "restitution": 0.0
+  },
+  "chassis": {
+    "density": 800.0,
+    "ke": 0.0,
+    "kd": 0.0,
+    "mu": 0.6,
+    "restitution": 0.0
+  },
+  "wheel": {
+    "density": 300.0,
+    "ke": 0.0,
+    "kd": 0.0,
+    "mu": 1.0,
+    "restitution": 0.0
+  }
+}

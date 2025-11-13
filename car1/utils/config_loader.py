@@ -31,6 +31,7 @@ class SimulationConfig:
     soft_bodies: JSONList = field(default_factory=list)
     constraints: JSONList = field(default_factory=list)
     sim_params: JSONDict = field(default_factory=dict)
+    materials: JSONDict = field(default_factory=dict)
 
 
 def _read_json_object(path: Path) -> JSONDict:
@@ -100,6 +101,7 @@ def load_all_configs(config_dir: Union[str, Path]) -> SimulationConfig:
 
     scene_path = base / "scene.json"
     sim_params_path = base / "sim_params.json"
+    material_path = base / "material.json"
     constraints_path = _resolve_constraints_path(base)
 
     # 读取 scene.json
@@ -125,11 +127,18 @@ def load_all_configs(config_dir: Union[str, Path]) -> SimulationConfig:
     sim_params = _read_json_object(sim_params_path)
     sim_params = _ensure_dict(sim_params, "sim_params")
 
+    # 读取材料库（可选）
+    materials: JSONDict = {}
+    if material_path.exists() and material_path.is_file():
+        materials = _read_json_object(material_path)
+        materials = _ensure_dict(materials, "materials")
+
     return SimulationConfig(
         rigid_bodies=rigid_bodies,
         soft_bodies=soft_bodies,
         constraints=constraints,
         sim_params=sim_params,
+        materials=materials,
     )
 
 

@@ -1,20 +1,80 @@
 {
-    "rigid_soft_links": [
+    "constraints": [
         {
-            "rigid": "hub_FL",
-            "soft": "tire_FL",
-            "points": [
-                10,
-                25,
-                40,
-                55
+            "type": "revolute",
+            "key": "hinge_fl",
+            "parent": "body",
+            "child": "wheel_FL",
+            "parent_pos": [
+                0.7,
+                0.3,
+                -0.30
             ],
-            "type": "anchor",
-            "stiffness": 1.0
+            "child_pos": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "axis": "Y",
+            "target_ke": 50.0,
+            "target_kd": 0.0
+        },
+        {
+            "type": "revolute",
+            "key": "hinge_fr",
+            "parent": "body",
+            "child": "wheel_FR",
+            "parent_pos": [
+                0.7,
+                -0.3,
+                -0.30
+            ],
+            "child_pos": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "axis": "Y",
+            "target_ke": 50.0,
+            "target_kd": 0.0
+        },
+        {
+            "type": "revolute",
+            "key": "hinge_rl",
+            "parent": "body",
+            "child": "wheel_RL",
+            "parent_pos": [
+                -0.7,
+                0.3,
+                -0.30
+            ],
+            "child_pos": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "axis": "Y",
+            "target_ke": 50.0,
+            "target_kd": 0.0
+        },
+        {
+            "type": "revolute",
+            "key": "hinge_rr",
+            "parent": "body",
+            "child": "wheel_RR",
+            "parent_pos": [
+                -0.7,
+                -0.3,
+                -0.30
+            ],
+            "child_pos": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "axis": "Y",
+            "target_ke": 50.0,
+            "target_kd": 0.0
         }
-    ],
-    "soft_internal": {
-        "edge_stiffness": 0.8,
-        "volume_stiffness": 0.9
-    }
+    ]
 }

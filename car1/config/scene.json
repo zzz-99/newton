@@ -9,48 +9,85 @@
                 0.5
             ],
             "pos": [
-                0,
-                0.5,
-                0
-            ]
+                0.0,
+                0.0,
+                0.45
+            ],
+            "rpy": [
+                1.5708,
+                0.0,
+                0.0
+            ],
+            "material": "chassis"
         },
         {
-            "id": "hub_FL",
+            "id": "wheel_FL",
             "shape": "cylinder",
             "radius": 0.15,
             "height": 0.1,
-            "pos": [
-                0.7,
-                0.3,
-                0.4
-            ]
-        }
-    ],
-    "soft_bodies": [
-        {
-            "id": "tire_FL",
-            "type": "sphere",
-            "radius": 0.25,
-            "resolution": 10,
-            "pos": [
-                0.7,
-                0.3,
-                0.4
-            ]
-        }
-    ],
-    "constraints": [
-        {
-            "type": "anchor",
-            "rigid": "hub_FL",
-            "soft": "tire_FL",
-            "points": [
-                5,
-                10,
-                15,
-                20
+            "rpy": [
+                1.5708,
+                0.0,
+                1.5708
             ],
-            "stiffness": 1.0
+            "pos": [
+                0.7,
+                0.3,
+                0.15
+            ],
+            "material": "wheel"
+        },
+        {
+            "id": "wheel_FR",
+            "shape": "cylinder",
+            "radius": 0.15,
+            "height": 0.1,
+            "rpy": [
+                1.5708,
+                0.0,
+                1.5708
+            ],
+            "pos": [
+                0.7,
+                -0.3,
+                0.15
+            ],
+            "material": "wheel"
+        },
+        {
+            "id": "wheel_RL",
+            "shape": "cylinder",
+            "radius": 0.15,
+            "height": 0.1,
+            "rpy": [
+                1.5708,
+                0.0,
+                1.5708
+            ],
+            "pos": [
+                -0.7,
+                0.3,
+                0.15
+            ],
+            "material": "wheel"
+        },
+        {
+            "id": "wheel_RR",
+            "shape": "cylinder",
+            "radius": 0.15,
+            "height": 0.1,
+            "rpy": [
+                1.5708,
+                0.0,
+                1.5708
+            ],
+            "pos": [
+                -0.7,
+                -0.3,
+                0.15
+            ],
+            "material": "wheel"
         }
-    ]
+    ],
+    "soft_bodies": []
 }
